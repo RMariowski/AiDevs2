@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiDevs2", "AiDevs2\AiDevs2.csproj", "{CE33980E-C489-4288-B8B6-9F87A54F78AA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CE33980E-C489-4288-B8B6-9F87A54F78AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE33980E-C489-4288-B8B6-9F87A54F78AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE33980E-C489-4288-B8B6-9F87A54F78AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE33980E-C489-4288-B8B6-9F87A54F78AA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
