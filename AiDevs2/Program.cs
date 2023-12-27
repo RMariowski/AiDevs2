@@ -1,5 +1,7 @@
 ﻿using AiDevs2;
 using AiDevs2.Tasks;
+using Azure.AI.OpenAI;
 
 AiDevsClient aiDevsClient = new();
-await Knowledge.StartAsync(aiDevsClient);
+OpenAIClient openAiClient = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
+await Knowledge.StartAsync(aiDevsClient, openAiClient);

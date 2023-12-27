@@ -6,18 +6,27 @@
  * dane, rzuć okiem na hinta: https://zadania.aidevs.pl/hint/functions
  */
 
+using Azure.AI.OpenAI;
+
 namespace AiDevs2.Tasks;
 
 internal sealed class Functions
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
     {
         var tokenResponse = await aiDevsClient.GetTokenAsync("functions");
         Console.WriteLine(tokenResponse);
 
         _ = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
 
-        const string answer =
+        var answer = GetAnswer();
+
+        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+    }
+
+    private static string GetAnswer()
+    {
+        return
             """
             {
                 "answer": {
@@ -43,8 +52,6 @@ internal sealed class Functions
                 }
             }
             """;
-
-        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
     }
 
     private record TaskResponse;

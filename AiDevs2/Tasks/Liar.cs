@@ -16,28 +16,38 @@ namespace AiDevs2.Tasks;
 
 internal sealed class Liar
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
+    private const string Question = "What is capital of Poland?";
+
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
     {
         var tokenResponse = await aiDevsClient.GetTokenAsync("liar");
         Console.WriteLine(tokenResponse);
 
-        const string question = "What is capital of Poland?";
-        MultipartFormDataContent taskRequest = new() { { new StringContent(question), "question" } };
+        MultipartFormDataContent taskRequest = new() { { new StringContent(Question), "question" } };
         var taskResponse = await aiDevsClient.PostTaskAsync<TaskResponse>(tokenResponse.Token, taskRequest);
 
-        OpenAIClient client = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
+        var answer = await GetAnswerAsync(openAiClient, taskResponse);
+        Console.WriteLine($"OpenAI Answer: {answer}");
+
+        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+    }
+
+    private static async Task<string> GetAnswerAsync(OpenAIClient openAiClient, TaskResponse taskResponse)
+    {
         const string systemMessage =
             """
             You are checking whatever answer matches to question.
             If answer matches to question then return only one word YES without any explanation, otherwise NO.
             Return answer in JSON format, for example {"answer":"YES"}.
             """;
+
         var userMessage =
             $"""
-             Question: {question}
+             Question: {Question}
              Answer: {taskResponse.Answer}
              """;
-        var chatCompletionsResponse = await client.GetChatCompletionsAsync(new ChatCompletionsOptions
+
+        var chatCompletionsResponse = await openAiClient.GetChatCompletionsAsync(new ChatCompletionsOptions
         {
             DeploymentName = "gpt-3.5-turbo",
             Messages =
@@ -46,12 +56,8 @@ internal sealed class Liar
                 new ChatRequestUserMessage(userMessage),
             }
         });
-        var chat = chatCompletionsResponse.Value;
 
-        var answer = chat.Choices[0].Message.Content;
-        Console.WriteLine($"OpenAI Answer: {answer}");
-
-        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+        return chatCompletionsResponse.Value.Choices[0].Message.Content;
     }
 
     private record TaskResponse(string Answer);

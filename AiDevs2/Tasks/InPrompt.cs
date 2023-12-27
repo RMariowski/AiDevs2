@@ -15,39 +15,47 @@ namespace AiDevs2.Tasks;
 
 internal sealed class InPrompt
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
     {
         var tokenResponse = await aiDevsClient.GetTokenAsync("inprompt");
         Console.WriteLine(tokenResponse);
 
         var (input, question) = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
 
+        var name = GetNameFromQuestion(question);
+        var filteredDataList = string.Join("\n", input.Where(sentence => sentence.Contains(name)));
+
+        var answer = await GetAnswerAsync(openAiClient, filteredDataList, question);
+        Console.WriteLine($"OpenAI Answer: {answer}");
+
+        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+    }
+
+    private static string GetNameFromQuestion(string question)
+    {
         var lastSpaceIndex = question.LastIndexOf(' ', question.LastIndexOf('?') - 1);
-        var name = question.Substring(lastSpaceIndex + 1, question.Length - lastSpaceIndex - 2);
-        var filteredInput = string.Join("\n", input.Where(sentence => sentence.Contains(name)));
+        return question.Substring(lastSpaceIndex + 1, question.Length - lastSpaceIndex - 2);
+    }
 
-        OpenAIClient client = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
-
+    private static async Task<string> GetAnswerAsync(OpenAIClient openAiClient, string dataList, string question)
+    {
         var systemMessage =
             $$"""
-                Na pytanie użytkownika odpowiadaj na podstawie tej listy: {{filteredInput}}
+                Na pytanie użytkownika odpowiadaj na podstawie tej listy: {{dataList}}
                 Odpowiedź zwracaj w formacie JSON np. {"answer":"odpowiedź"}.
               """;
-        var chatCompletionsResponse = await client.GetChatCompletionsAsync(new ChatCompletionsOptions
+
+        var chatCompletionsResponse = await openAiClient.GetChatCompletionsAsync(new ChatCompletionsOptions
         {
             DeploymentName = "gpt-3.5-turbo",
             Messages =
             {
                 new ChatRequestSystemMessage(systemMessage),
-                new ChatRequestUserMessage(question),
+                new ChatRequestUserMessage(question)
             }
         });
-        var chat = chatCompletionsResponse.Value;
 
-        var answer = chat.Choices[0].Message.Content;
-        Console.WriteLine($"OpenAI Answer: {answer}");
-
-        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+        return chatCompletionsResponse.Value.Choices[0].Message.Content;
     }
 
     private record TaskResponse(string[] Input, string Question);

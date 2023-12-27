@@ -1,5 +1,4 @@
-﻿using System.Text.Json;
-using Azure.AI.OpenAI;
+﻿using Azure.AI.OpenAI;
 
 /*
  * Rozwiąż zadanie API o nawie embedding.
@@ -13,29 +12,29 @@ namespace AiDevs2.Tasks;
 
 internal sealed class Embedding
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
     {
         var tokenResponse = await aiDevsClient.GetTokenAsync("embedding");
         Console.WriteLine(tokenResponse);
 
         _ = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
 
-        OpenAIClient client = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
+        var answer = await GetEmbeddingAsync(openAiClient);
+        Console.WriteLine($"OpenAI Answer: {answer}");
 
-        var embeddingResponse = await client.GetEmbeddingsAsync(new EmbeddingsOptions
+        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+    }
+
+    private static async Task<AnswerRequest> GetEmbeddingAsync(OpenAIClient openAiClient)
+    {
+        var embeddingResponse = await openAiClient.GetEmbeddingsAsync(new EmbeddingsOptions
         {
             DeploymentName = "text-embedding-ada-002",
             Input = { "Hawaiian pizza" }
         });
 
-        var answer = JsonSerializer.Serialize(new
-        {
-            answer = embeddingResponse.Value.Data.SelectMany(emb => emb.Embedding.ToArray()).ToArray()
-        });
-
-        Console.WriteLine($"OpenAI Answer: {answer}");
-
-        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+        var embedding = embeddingResponse.Value.Data.SelectMany(emb => emb.Embedding.ToArray()).ToArray();
+        return new AnswerRequest(embedding);
     }
 
     private record TaskResponse;

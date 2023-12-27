@@ -13,7 +13,7 @@ namespace AiDevs2.Tasks;
 
 internal sealed class Knowledge
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
     {
         var tokenResponse = await aiDevsClient.GetTokenAsync("knowledge");
         Console.WriteLine(tokenResponse);
@@ -21,13 +21,30 @@ internal sealed class Knowledge
         var taskResponse = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
         Console.WriteLine(taskResponse);
 
-        OpenAIClient client = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
-        const string systemMessage = 
-            """
-            Użytkownik zadaje pytanie.
-            Odpowiedź na nie zwracaj w formacie JSON np. {"answer":"Odpowiedź"}.
-            """;
-        var chatCompletionsResponse = await client.GetChatCompletionsAsync(new ChatCompletionsOptions
+        var chat = await GetChatCompletionsAsync(openAiClient, taskResponse);
+
+        AnswerRequest answer;
+        var message = chat.Choices[0].Message;
+        if (message.FunctionCall is null)
+        {
+            answer = new AnswerRequest(chat.Choices[0].Message.Content);
+        }
+        else
+            answer = message.FunctionCall.Name switch
+            {
+                "GetPopulation" => await GetPopulationAnswerAsync(message),
+                "GetExchangeRate" => await GetExchangeRateAnswerAsync(message),
+                _ => throw new ApplicationException("Something went wrong...")
+            };
+
+        Console.WriteLine($"OpenAI Answer: {answer}");
+        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+    }
+
+    private static async Task<ChatCompletions> GetChatCompletionsAsync(OpenAIClient openAiClient,
+        TaskResponse taskResponse)
+    {
+        var chatCompletionsResponse = await openAiClient.GetChatCompletionsAsync(new ChatCompletionsOptions
         {
             DeploymentName = "gpt-4",
             Functions =
@@ -37,39 +54,11 @@ internal sealed class Knowledge
             },
             Messages =
             {
-                new ChatRequestSystemMessage(systemMessage),
                 new ChatRequestUserMessage(taskResponse.Question)
             }
         });
-        var chat = chatCompletionsResponse.Value;
 
-        string answer;
-        var message = chat.Choices[0].Message;
-        if (message.FunctionCall is null)
-        {
-            answer = chat.Choices[0].Message.Content;
-        }
-        else if (message.FunctionCall.Name == "GetPopulation")
-        {
-            var country = JsonSerializer.Deserialize<FunctionParams>(message.FunctionCall.Arguments)!.value;
-            var populationResponse = await new HttpClient().GetFromJsonAsync<PopulationResponse[]>(
-                $"https://restcountries.com/v3.1/name/{country}");
-            answer = $$"""{"answer":{{populationResponse![0].Population}}}""";
-        }
-        else if (message.FunctionCall.Name == "GetExchangeRate")
-        {
-            var currency = JsonSerializer.Deserialize<FunctionParams>(message.FunctionCall.Arguments)!.value;
-            var exchangeResponse = await new HttpClient().GetFromJsonAsync<ExchangeRateResponse>(
-                $"https://api.nbp.pl/api/exchangerates/rates/a/{currency}?format=json");
-            answer = $$"""{"answer":{{exchangeResponse!.Rates[0].Ask}}}""";
-        }
-        else
-        {
-            answer = chat.Choices[0].Message.Content;
-        }
-
-        Console.WriteLine($"OpenAI Answer: {answer}");
-        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+        return chatCompletionsResponse.Value;
     }
 
     private static FunctionDefinition GetPopulationFunctionDefinition()
@@ -119,6 +108,22 @@ internal sealed class Knowledge
                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
         };
     }
+    
+    private static async Task<AnswerRequest> GetExchangeRateAnswerAsync(ChatResponseMessage message)
+    {
+        var currency = JsonSerializer.Deserialize<FunctionParams>(message.FunctionCall.Arguments)!.value;
+        var exchangeResponse = await new HttpClient().GetFromJsonAsync<ExchangeRateResponse>(
+            $"https://api.nbp.pl/api/exchangerates/rates/a/{currency}?format=json");
+        return new AnswerRequest(exchangeResponse!.Rates[0].Ask);
+    }
+
+    private static async Task<AnswerRequest> GetPopulationAnswerAsync(ChatResponseMessage message)
+    {
+        var country = JsonSerializer.Deserialize<FunctionParams>(message.FunctionCall.Arguments)!.value;
+        var populationResponse = await new HttpClient().GetFromJsonAsync<PopulationResponse[]>(
+            $"https://restcountries.com/v3.1/name/{country}");
+        return new AnswerRequest(populationResponse![0].Population);
+    }
 
     private record TaskResponse(string Question);
 
@@ -127,5 +132,6 @@ internal sealed class Knowledge
     private record PopulationResponse(int Population);
 
     private record ExchangeRateResponse(ExchangeRateItemResponse[] Rates);
+
     private record ExchangeRateItemResponse(decimal Ask);
 }

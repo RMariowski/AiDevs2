@@ -11,38 +11,40 @@ namespace AiDevs2.Tasks;
 
 internal sealed class Blogger
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
     {
         var tokenResponse = await aiDevsClient.GetTokenAsync("blogger");
         Console.WriteLine(tokenResponse);
 
         var taskResponse = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
-        Console.WriteLine(taskResponse);
 
-        OpenAIClient client = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
+        var answer = await GetTextForChaptersAsync(openAiClient, taskResponse);
+        Console.WriteLine($"OpenAI Answer: {answer}");
+
+        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+    }
+
+    private static async Task<string> GetTextForChaptersAsync(OpenAIClient openAiClient, TaskResponse taskResponse)
+    {
         const string systemMessage =
             """
-            Jesteś asystentem blogera, który kocha pizze.
-            Użytkownik podaje rozdziały, a ty dla każdego z nich przygotowujesz tekst na bloga na temat przyrządzania pizzy Margherity.
-            Odpowiedź zwracaj w formacie JSON np. {"answer":["tekst 1","tekst 2","tekst 3","tekst 4"]}.
-            Do odpowiedzi nie dodawaj tytułów rozdziałów, które podał użytkownik.
+            Dla każdego rozdziału podanego przez użytkownika przygotuj tekst o przyrządzania pizzy Margherita na bloga.
+            Odpowiedź zwracaj w formacie JSON np. {"answer":["tekst dla rozdziału 1","tekst dla rozdziału 2","tekst dla rozdziału 3","tekst dla rozdziału 4"]}.
+            W odpowiedzi nie podawaj tytułów rozdziałów, które podał użytkownik.
             """;
+
         var userMessage = string.Join("\n", taskResponse.Blog);
-        var chatCompletionsResponse = await client.GetChatCompletionsAsync(new ChatCompletionsOptions
+
+        var chatCompletionsResponse = await openAiClient.GetChatCompletionsAsync(new ChatCompletionsOptions
         {
             DeploymentName = "gpt-3.5-turbo",
             Messages =
             {
                 new ChatRequestSystemMessage(systemMessage),
-                new ChatRequestUserMessage(userMessage),
+                new ChatRequestUserMessage(userMessage)
             }
         });
-        var chat = chatCompletionsResponse.Value;
-
-        var answer = chat.Choices[0].Message.Content;
-        Console.WriteLine($"OpenAI Answer: {answer}");
-
-        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+        return chatCompletionsResponse.Value.Choices[0].Message.Content;
     }
 
     private record TaskResponse(string[] Blog);

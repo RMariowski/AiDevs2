@@ -12,22 +12,31 @@ namespace AiDevs2.Tasks;
 
 internal sealed class Moderation
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
     {
         var tokenResponse = await aiDevsClient.GetTokenAsync("moderation");
         Console.WriteLine(tokenResponse);
 
         var taskResponse = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
 
-        OpenAIClient client = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
+        var answer = await GetAnswerAsync(openAiClient, taskResponse);
+        Console.WriteLine($"OpenAI Answer: {answer}");
+
+        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+    }
+
+    private static async Task<string> GetAnswerAsync(OpenAIClient openAiClient, TaskResponse taskResponse)
+    {
         const string systemMessage =
             """
             Jesteś moderatorem tekstu.
             Użytkownik podaje treść, która wymaga moderacji. Jeśli zdanie nie przeszło moderacji to nadaj mu wartość 1, w przeciwnym wypadku 0.
             Odpowiedź zwracaj w formacie JSON np. {"answer":[1,0,0,1]}.
             """;
+
         var userMessage = string.Join("\n", taskResponse.Input);
-        var chatCompletionsResponse = await client.GetChatCompletionsAsync(new ChatCompletionsOptions
+
+        var chatCompletionsResponse = await openAiClient.GetChatCompletionsAsync(new ChatCompletionsOptions
         {
             DeploymentName = "gpt-3.5-turbo",
             Messages =
@@ -36,12 +45,8 @@ internal sealed class Moderation
                 new ChatRequestUserMessage(userMessage),
             }
         });
-        var chat = chatCompletionsResponse.Value;
 
-        var answer = chat.Choices[0].Message.Content;
-        Console.WriteLine($"OpenAI Answer: {answer}");
-
-        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+        return chatCompletionsResponse.Value.Choices[0].Message.Content;
     }
 
     private record TaskResponse(string[] Input);

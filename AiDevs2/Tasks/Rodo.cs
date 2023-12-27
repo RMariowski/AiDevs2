@@ -6,24 +6,21 @@
  * nie zdradzając prawdziwych danych.
  */
 
+using Azure.AI.OpenAI;
+
 namespace AiDevs2.Tasks;
 
 internal sealed class Rodo
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
     {
         var tokenResponse = await aiDevsClient.GetTokenAsync("rodo");
         Console.WriteLine(tokenResponse);
 
-        var taskResponse = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
-        Console.WriteLine(taskResponse);
+        _ = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
 
-        const string answer =
-            """
-            {
-                "answer": "In place of your personal data put: %imie% for first name, %nazwisko% for last name, %miasto% for city and %zawod% for profession."
-            }
-            """;
+        AnswerRequest answer = new(
+            "In place of your personal data put: %imie% for first name, %nazwisko% for last name, %miasto% for city and %zawod% for profession.");
 
         await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
     }

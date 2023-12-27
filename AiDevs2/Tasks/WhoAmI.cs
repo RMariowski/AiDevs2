@@ -16,18 +16,17 @@ namespace AiDevs2.Tasks;
 
 internal sealed class WhoAmI
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
-    {
-        const int maxRetries = 6;
-        var tokenLifeTime = TimeSpan.FromSeconds(2);
+    private const int MaxRetriesForHints = 6;
+    private static readonly TimeSpan TokenLifeTime = TimeSpan.FromSeconds(2);
 
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
+    {
         List<string> hints = [];
-        OpenAIClient client = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
         TokenResponse tokenResponse = null!;
         var tokenReceivedDateTime = DateTime.MinValue;
-        for (var i = 0; i < maxRetries; ++i)
+        for (var i = 0; i < MaxRetriesForHints; ++i)
         {
-            if (DateTime.UtcNow - tokenReceivedDateTime >= tokenLifeTime)
+            if (DateTime.UtcNow - tokenReceivedDateTime >= TokenLifeTime)
             {
                 tokenResponse = await aiDevsClient.GetTokenAsync("whoami");
                 tokenReceivedDateTime = DateTime.UtcNow;
@@ -36,25 +35,9 @@ internal sealed class WhoAmI
 
             var taskResponse = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
             Console.WriteLine(taskResponse);
-
-            const string systemMessage =
-                """
-                Based on hints you need to guess person.
-                If you are completely sure who the person is then return result in JSON format for example: {"answer":"FirstName LastName"}.
-                If you are not sure then just return NO
-                """;
             hints.Add(taskResponse.Hint);
-            ChatCompletionsOptions chatCompletionsOptions = new()
-            {
-                DeploymentName = "gpt-3.5-turbo",
-                Messages = { new ChatRequestSystemMessage(systemMessage) }
-            };
-            foreach (var hint in hints)
-                chatCompletionsOptions.Messages.Add(new ChatRequestUserMessage(hint));
-            var chatCompletionsResponse = await client.GetChatCompletionsAsync(chatCompletionsOptions);
-            var chat = chatCompletionsResponse.Value;
 
-            var answer = chat.Choices[0].Message.Content;
+            var answer = await GetAnswerAsync(openAiClient, hints);
             Console.WriteLine($"OpenAI Answer: {answer}");
 
             if (answer.Equals("NO", StringComparison.InvariantCultureIgnoreCase))
@@ -65,6 +48,28 @@ internal sealed class WhoAmI
                 continue;
             break;
         }
+    }
+
+    private static async Task<string> GetAnswerAsync(OpenAIClient openAiClient, List<string> hints)
+    {
+        const string systemMessage =
+            """
+            Based on hints you need to guess person.
+            If you are completely sure who the person is then return result in JSON format for example: {"answer":"FirstName LastName"}.
+            If you are not sure then just return NO
+            """;
+
+        ChatCompletionsOptions chatCompletionsOptions = new()
+        {
+            DeploymentName = "gpt-3.5-turbo",
+            Messages = { new ChatRequestSystemMessage(systemMessage) }
+        };
+
+        foreach (var hint in hints)
+            chatCompletionsOptions.Messages.Add(new ChatRequestUserMessage(hint));
+
+        var chatCompletionsResponse = await openAiClient.GetChatCompletionsAsync(chatCompletionsOptions);
+        return chatCompletionsResponse.Value.Choices[0].Message.Content;
     }
 
     private record TaskResponse(string Hint);

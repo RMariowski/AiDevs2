@@ -16,7 +16,7 @@ namespace AiDevs2.Tasks;
 
 internal sealed class Scraper
 {
-    public static async Task StartAsync(AiDevsClient aiDevsClient)
+    public static async Task StartAsync(AiDevsClient aiDevsClient, OpenAIClient openAiClient)
     {
         var tokenResponse = await aiDevsClient.GetTokenAsync("scraper");
         Console.WriteLine(tokenResponse);
@@ -24,6 +24,16 @@ internal sealed class Scraper
         var taskResponse = await aiDevsClient.GetTaskAsync<TaskResponse>(tokenResponse.Token);
         Console.WriteLine(taskResponse);
 
+        var fileContent = await GetFileContentAsync(taskResponse);
+
+        var answer = await GetAnswerAsync(openAiClient, fileContent, taskResponse);
+        Console.WriteLine($"OpenAI Answer: {answer}");
+
+        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+    }
+
+    private static async Task<string> GetFileContentAsync(TaskResponse taskResponse)
+    {
         var fileResponse = await HttpPolicyExtensions
             .HandleTransientHttpError()
             .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)))
@@ -33,17 +43,23 @@ internal sealed class Scraper
                 var response = await client.GetAsync(taskResponse.Input);
                 return response;
             });
-        var fileContent = await fileResponse.Content.ReadAsStringAsync();
 
-        OpenAIClient client = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
+        return await fileResponse.Content.ReadAsStringAsync();
+    }
+
+    private static async Task<string> GetAnswerAsync(OpenAIClient openAiClient, string fileContent,
+        TaskResponse taskResponse)
+    {
         var systemMessage =
             $$"""
               {{fileContent}}
               {{taskResponse.Msg}}
               Return result in JSON format for example: {"answer":"text"}.
               """;
+
         var userMessage = taskResponse.Question;
-        var chatCompletionsResponse = await client.GetChatCompletionsAsync(new ChatCompletionsOptions
+
+        var chatCompletionsResponse = await openAiClient.GetChatCompletionsAsync(new ChatCompletionsOptions
         {
             DeploymentName = "gpt-3.5-turbo",
             Messages =
@@ -52,12 +68,8 @@ internal sealed class Scraper
                 new ChatRequestUserMessage(userMessage),
             }
         });
-        var chat = chatCompletionsResponse.Value;
 
-        var answer = chat.Choices[0].Message.Content;
-        Console.WriteLine($"OpenAI Answer: {answer}");
-
-        await aiDevsClient.SendAnswerAsync(tokenResponse.Token, answer);
+        return chatCompletionsResponse.Value.Choices[0].Message.Content;
     }
 
     private record TaskResponse(string Msg, string Input, string Question);

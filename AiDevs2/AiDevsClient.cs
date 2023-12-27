@@ -40,4 +40,12 @@ internal class AiDevsClient
         Console.WriteLine(answerResponse);
         return answerResponse!;
     }
+    
+    public async Task<AnswerResponse> SendAnswerAsync(string token, AnswerRequest answer)
+    {
+        var postAnswerResponse = await _client.PostAsJsonAsync($"/answer/{token}", answer);
+        var answerResponse = await postAnswerResponse.Content.ReadFromJsonAsync<AnswerResponse>();
+        Console.WriteLine(answerResponse);
+        return answerResponse!;
+    }
 }
