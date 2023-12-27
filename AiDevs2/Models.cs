@@ -2,4 +2,4 @@
 
 internal record TokenResponse(string Token);
 
-internal record AnswerResponse(int Code);
+internal record AnswerResponse(string Msg, int Code);
