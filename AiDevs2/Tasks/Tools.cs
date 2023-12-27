@@ -2,6 +2,13 @@
 using System.Text.Json.Serialization;
 using Azure.AI.OpenAI;
 
+/*
+ * Rozwiąż zadanie API o nazwie ‘tools’. Celem zadania jest zdecydowanie, czy podane przez API zadanie powinno zostać
+ * dodane do listy zadań (ToDo), czy do kalendarza (jeśli ma ustaloną datę). Oba narzędzia mają lekko różniące się
+ * od siebie definicje struktury JSON-a (różnią się jednym polem). Spraw, aby Twoja aplikacja działała poprawnie na
+ * każdym zestawie danych testowych.
+ */
+
 namespace AiDevs2.Tasks;
 
 internal sealed class Tools
