@@ -2,4 +2,4 @@
 using AiDevs2.Tasks;
 
 AiDevsClient aiDevsClient = new();
-await People.StartAsync(aiDevsClient);
+await Knowledge.StartAsync(aiDevsClient);
