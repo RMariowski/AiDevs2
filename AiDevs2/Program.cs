@@ -4,4 +4,4 @@ using Azure.AI.OpenAI;
 
 AiDevsClient aiDevsClient = new();
 OpenAIClient openAiClient = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
-await Knowledge.StartAsync(aiDevsClient, openAiClient);
+await Tools.StartAsync(aiDevsClient, openAiClient);
