@@ -4,4 +4,4 @@ using Azure.AI.OpenAI;
 
 AiDevsClient aiDevsClient = new();
 OpenAIClient openAiClient = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
-await Gnome.StartAsync(aiDevsClient, openAiClient);
+await Whisper.StartAsync(aiDevsClient, openAiClient);
