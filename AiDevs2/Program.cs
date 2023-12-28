@@ -4,4 +4,4 @@ using Azure.AI.OpenAI;
 
 AiDevsClient aiDevsClient = new();
 OpenAIClient openAiClient = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
-await Whisper.StartAsync(aiDevsClient, openAiClient);
+await Meme.StartAsync(aiDevsClient, openAiClient);
