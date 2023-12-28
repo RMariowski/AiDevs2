@@ -4,4 +4,4 @@ using Azure.AI.OpenAI;
 
 AiDevsClient aiDevsClient = new();
 OpenAIClient openAiClient = new(Envs.OpenAiApiKey, new OpenAIClientOptions());
-await Meme.StartAsync(aiDevsClient, openAiClient);
+await OptimalDb.StartAsync(aiDevsClient, openAiClient);
